@@ -1,0 +1,55 @@
+apiVersion: apps/v1 
+kind: StatefulSet 
+metadata: 
+  name: jenkins-master 
+  namespace: jenkins 
+spec: 
+  replicas: 1 
+  serviceName: jenkins 
+  selector: 
+    matchLabels: 
+      devops: jenkins-master 
+  template: 
+    metadata:
+      labels: 
+        devops: jenkins-master
+    spec:
+     # nodeSelector:
+     #   jenkins: "true"
+     # tolerations: 
+     # - operator: "Exists"
+      serviceAccount: jenkins
+      initContainers: 
+      - name: fix-permissions 
+        image: busybox 
+        command: ["sh", "-c", "chown -R 1000:1000 /var/jenkins_home"] 
+        securityContext: 
+          privileged: true
+        volumeMounts: 
+        - name: jenkinshome 
+          mountPath: /var/jenkins_home
+      containers:
+      - name: jenkins
+        image: reg.linux.io/cicd/jenkinsci-blueocean:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8080
+        - name: slavelistener
+          containerPort: 50000
+        volumeMounts:
+        - name: jenkinshome
+          mountPath: /var/jenkins_home
+        env: 
+        - name: JAVA_OPTS
+          value: "-Xms4096m -Xmx5120m -Duser.timezone=Asia/Shanghai -Dhudson.model.DirectoryBrowserSupport.CSP="
+  volumeClaimTemplates:
+  - metadata:
+      name: jenkinshome
+    spec:
+      storageClassName: "managed-nfs-storage"
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 20Gi
+
